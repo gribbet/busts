@@ -1,3 +1,5 @@
+import type { Channel } from "./channel";
+import { reserved } from "./constants";
 import type { TypeType } from "./type";
 import {
   boolean,
@@ -25,3 +27,20 @@ export type Frame = TypeType<typeof frame>;
 
 export const encodeFrame = (_: Frame) => encode(frame, _);
 export const decodeFrame = (_: Uint8Array) => decode(frame, _);
+
+export const createFrameChannel = (
+  channel: Channel<Uint8Array>,
+  id: number,
+) => {
+  const read = (handler: (_: Frame) => void) =>
+    channel.read(_ => {
+      const frame = decodeFrame(_);
+      if (frame.reserved === reserved && frame.destination === id)
+        handler(frame);
+    });
+
+  const write = (_: Frame) => channel.write(encodeFrame({ ..._, source: id }));
+  const { destroy } = channel;
+
+  return { read, write, destroy } satisfies Channel<Frame>;
+};
