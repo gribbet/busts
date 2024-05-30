@@ -32,7 +32,7 @@ const channel = createFrameChannel(
 
 const client = createClient(channel, service);
 
-createServer(channel, {
+createServer(channel, service, {
   status: async (_, source) => {
     console.log(`Found id ${source}`);
     const { name } = await client.info(undefined, source);
