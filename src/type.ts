@@ -1,4 +1,5 @@
 import { createReader, type Reader } from "./reader";
+import type { Any } from "./util";
 import { assert, keys } from "./util";
 import { createWriter, type Writer } from "./writer";
 
@@ -9,6 +10,20 @@ export type Type<T> = {
 };
 
 export type TypeType<T> = T extends Type<infer U> ? U : never;
+
+export type Method<Request extends Type<Any>, Response extends Type<Any>> = {
+  request: Request;
+  response: Response;
+};
+
+export type Service = { [name: string]: Method<Any, Any> };
+
+export type ServiceType<S extends Service> = {
+  [Name in keyof S]: (
+    request: TypeType<S[Name]["request"]>,
+    source?: number,
+  ) => TypeType<S[Name]["response"]> | Promise<TypeType<S[Name]["response"]>>;
+};
 
 export const encode = <T>(type: Type<T>, _: T) => {
   const writer = createWriter();

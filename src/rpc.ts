@@ -1,42 +1,81 @@
 import type { Channel } from "./channel";
 import { decodeFrame, encodeFrame, type Frame } from "./frame";
-import {
-  type ServiceName,
-  type ServiceRequest,
-  type ServiceResponse,
-  type Services,
-} from "./specification";
+import { methodSignature } from "./signature";
 import { createSubscriber } from "./subscriber";
+import type { Method, Service, ServiceType, TypeType } from "./type";
 import { decode, encode } from "./type";
-import { createSignal } from "./util";
+import type { Any } from "./util";
+import { createSignal, keys } from "./util";
 
 const reserved = 0xc7;
 
-export type Rpc<S extends Services> = {
-  request: <Name extends ServiceName<S>>(
-    name: Name,
-    request: ServiceRequest<S, Name>,
-    destination?: number,
-  ) => Promise<ServiceResponse<S, Name> | undefined>;
-  onRequest: <Name extends ServiceName<S>>(
-    name: Name,
-    handler: (
-      request: ServiceRequest<S, Name>,
-      source: number,
-    ) => Promise<ServiceResponse<S, Name>>,
-  ) => () => void;
+export type Server = {
   destroy: () => void;
 };
 
-export const createRpc = <S extends Services>(
-  channel: Channel,
-  services: Services,
-) => {
+export type Rpc = {
+  client: <S extends Service>(
+    service: S,
+    destination?: number,
+  ) => ServiceType<S>;
+  server: <S extends Service>(service: S, impl: ServiceType<S>) => Server;
+  destroy: () => void;
+};
+
+export const createRpc = (channel: Channel) => {
   const id = (Math.random() * 2 ** 32) >>> 0;
   let sequence = Math.random() * 2 ** 16;
-  const signatures = collectSignatures(services);
-
   const subscriber = createSubscriber<Frame>();
+
+  const client = <S extends Service>(service: S, destination = 0) => {
+    const clientMethod =
+      <Name extends keyof S & string>(name: Name) =>
+      async (request: TypeType<S[Name]["request"]>) => {
+        const method = service[name]!;
+        const payload = encode(method.request, request);
+        const signature = methodSignature(name, method);
+        const frame: Frame = {
+          reserved,
+          sequence,
+          request: true,
+          signature,
+          source: id,
+          destination,
+          payload,
+        };
+
+        const [response, onResponse] =
+          createSignal<TypeType<S[Name]["response"]>>();
+
+        const destroy = subscriber.subscribe(
+          ({ request, sequence, signature: _signature, payload }) => {
+            if (
+              request ||
+              signature !== _signature ||
+              sequence !== frame.sequence
+            )
+              return;
+            onResponse(decode(method.response, payload));
+          },
+        );
+
+        try {
+          channel.write(encodeFrame(frame));
+          sequence = (sequence + 1) % 2 ** 16;
+          return await response;
+        } finally {
+          destroy();
+        }
+      };
+
+    return keys(service).reduce((acc, name) => {
+      if (typeof name !== "string") return acc;
+      return {
+        ...acc,
+        [name]: clientMethod(name),
+      };
+    }, {} as ServiceType<S>);
+  };
 
   const destroy = channel.read(bytes => {
     const frame = decodeFrame(bytes);
@@ -49,67 +88,13 @@ export const createRpc = <S extends Services>(
     subscriber.emit(frame);
   });
 
-  const request = async <Name extends keyof Services>(
-    name: Name,
-    request: ServiceRequest<S, Name>,
-    destination = 0,
-  ) => {
-    const service = services[name];
-    const payload = encode(service.request, request);
-    const frame: Frame = {
-      reserved,
-      sequence,
-      request: true,
-      signature: signatures[name],
-      source: id,
-      destination,
-      payload,
-    };
-
-    const [response, onResponse] = createSignal<ServiceResponse<S, Name>>();
-
+  const server = <S extends Service>(service: S, impl: ServiceType<S>) => {
     const destroy = subscriber.subscribe(
-      ({ request, sequence, signature, payload }) => {
-        if (
-          request ||
-          signature !== signatures[name] ||
-          sequence !== frame.sequence
-        )
-          return;
-        onResponse(decode(service.response, payload));
-      },
-    );
-
-    await channel.write(encodeFrame(frame));
-    sequence = (sequence + 1) % 2 ** 16;
-    const result = await response;
-    destroy();
-    return result;
-  };
-
-  const onRequest = <Name extends ServiceName<S>>(
-    name: Name,
-    handler: (
-      Request: ServiceRequest<S, Name>,
-      source: number,
-    ) => Promise<ServiceResponse<S, Name>>,
-  ) =>
-    subscriber.subscribe(
-      async ({
-        request,
-        sequence,
-        signature,
-        source,
-        destination,
-        payload,
-      }) => {
-        const service = services[name];
-        if (!request || destination !== id || signature !== signatures[name])
-          return;
-        const response = await handler(
-          decode(service.request, payload),
-          source,
-        );
+      async ({ request, sequence, signature, source, payload }) => {
+        const method = undefined as unknown as Method<Any, Any> | undefined; // TODO: Match signature
+        const name = undefined as unknown as keyof S | undefined;
+        if (!method || !request) return;
+        const response = await impl[name](decode(method.request, payload));
         const frame: Frame = {
           reserved,
           request: false,
@@ -117,15 +102,18 @@ export const createRpc = <S extends Services>(
           signature,
           source: id,
           destination: source,
-          payload: encode(service.response, response),
+          payload: encode(method.response, response),
         };
-        await channel.write(encodeFrame(frame));
+        channel.write(encodeFrame(frame));
       },
     );
 
+    return { destroy };
+  };
+
   return {
-    request,
-    onRequest,
+    client,
+    server,
     destroy,
-  } satisfies Rpc<S>;
+  } satisfies Rpc;
 };

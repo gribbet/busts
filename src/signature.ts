@@ -1,10 +1,11 @@
-import type { Services } from "./specification";
-import { keys } from "./util";
+import { crc } from "./crc";
+import type { Method } from "./type";
+import type { Any } from "./util";
 
-export const collectSignatures = <S extends Services>(services: S) =>
-  keys(services).map(name => {
-    const { request, response } = services[name]!;
-    const description = `${name}: ${request.description} => ${response.description}`;
-    const signature = crc(new TextEncoder().encode(description));
-    return [name, signature];
-  });
+export const methodSignature = (
+  name: string,
+  { request, response }: Method<Any, Any>,
+) => {
+  const description = `${name}: ${request.description} => ${response.description}`;
+  return crc(new TextEncoder().encode(description));
+};
