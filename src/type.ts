@@ -1,4 +1,4 @@
-import type { Reader } from "./reader";
+import { createReader, type Reader } from "./reader";
 import { assert, keys } from "./util";
 import { createWriter, type Writer } from "./writer";
 
@@ -13,7 +13,7 @@ export type TypeType<T> = T extends Type<infer U> ? U : never;
 export const encode = <T>(type: Type<T>, _: T) => {
   const writer = createWriter();
   type.encode(writer, _);
-  return writer.bytes;
+  return writer.data;
 };
 
 export const decode = <T>(type: Type<T>, _: Uint8Array) =>

@@ -49,7 +49,7 @@ export const createRpc = <S extends Services>(
     subscriber.emit(frame);
   });
 
-  const request = async <Name extends ServiceName<S>>(
+  const request = async <Name extends keyof Services>(
     name: Name,
     request: ServiceRequest<S, Name>,
     destination = 0,
