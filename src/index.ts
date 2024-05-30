@@ -1,11 +1,11 @@
 import type { Channel } from "./channel";
 import { createClient } from "./client";
-import { createFrameChannel } from "./frame";
+import { createNode } from "./node";
 import { createServer } from "./server";
 import { createSubscriber } from "./subscriber";
 import { _void, literal, object, string, u64 } from "./type";
 
-const service = {
+const status = {
   status: {
     request: object({
       status: literal("ok"),
@@ -21,8 +21,6 @@ const service = {
   },
 } as const;
 
-const id = (Math.random() * 2 ** 32) >>> 0;
-
 const createMemoryChannel = () => {
   const { emit, subscribe } = createSubscriber<Uint8Array>();
   return {
@@ -32,17 +30,34 @@ const createMemoryChannel = () => {
   } satisfies Channel<Uint8Array>;
 };
 
-const channel = createFrameChannel(createMemoryChannel(), id);
+const channel = createMemoryChannel();
 
-const client = createClient(channel, service);
+for (let id = 1; id <= 3; id++) {
+  const node = createNode(channel, id);
 
-createServer(channel, service, {
+  const client = createClient(node, status);
+
+  createServer(node, status, {
+    status: () => {},
+    info: () => ({ name: `Testing ${id}` }),
+  });
+
+  setInterval(
+    () => client.status({ status: "ok", timestamp: BigInt(Date.now()) }),
+    1000,
+  );
+}
+
+const monitor = createNode(channel, 100);
+
+const client = createClient(monitor, status);
+
+createServer(monitor, status, {
   status: async (_, source) => {
-    console.log(`Found id ${source}`);
     const { name } = await client.info(undefined, source);
-    console.log(`Found id ${source} ${name}`);
+    console.log(`Found ${source}: ${name}`);
   },
-  info: () => ({ name: "Testing" }),
+  info: () => ({ name: "Monitor" }),
 });
 
 setInterval(

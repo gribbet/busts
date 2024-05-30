@@ -1,22 +1,25 @@
-import type { Channel } from "./channel";
 import { reserved } from "./constants";
 import { type Frame } from "./frame";
+import type { Node } from "./node";
 import { serviceSignatures } from "./signature";
 import type { Service, ServiceType, TypeType } from "./type";
 import { decode, encode } from "./type";
 import { createSignal, keys } from "./util";
 
 export const createClient = <S extends Service>(
-  channel: Channel<Frame>,
+  node: Node,
   service: S,
-  destination = 0,
+  _destination = 0,
 ) => {
   let sequence = (Math.random() * 2 ** 16) >>> 0;
   const signatures = serviceSignatures(service);
 
   const clientMethod =
     <Name extends keyof S & string>(name: Name) =>
-    async (request: TypeType<S[Name]["request"]>) => {
+    async (
+      request: TypeType<S[Name]["request"]>,
+      destination = _destination,
+    ) => {
       const method = service[name]!;
       const payload = encode(method.request, request);
       const signature = signatures[name];
@@ -33,7 +36,7 @@ export const createClient = <S extends Service>(
       const [response, onResponse] =
         createSignal<TypeType<S[Name]["response"]>>();
 
-      const destroy = channel.read(
+      const destroy = node.read(
         ({ request, sequence, signature: _signature, payload }) => {
           if (
             request ||
@@ -46,7 +49,7 @@ export const createClient = <S extends Service>(
       );
 
       try {
-        channel.write(frame);
+        node.write(frame);
         sequence = (sequence + 1) % 2 ** 16;
         return await response;
       } finally {

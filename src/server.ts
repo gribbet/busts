@@ -1,6 +1,5 @@
-import type { Channel } from "./channel";
 import { reserved } from "./constants";
-import { type Frame } from "./frame";
+import type { Node } from "./node";
 import { serviceSignatures } from "./signature";
 import type { Service, ServiceType } from "./type";
 import { decode, encode } from "./type";
@@ -11,13 +10,13 @@ export type Server = {
 };
 
 export const createServer = <S extends Service>(
-  channel: Channel<Frame>,
+  node: Node,
   service: S,
   impl: ServiceType<S>,
 ) => {
   const signatures = serviceSignatures(service);
 
-  const destroy = channel.read(
+  const destroy = node.read(
     async ({ request, sequence, signature, source, payload }) => {
       const name = keys(signatures).find(_ => signatures[_] === signature);
 
@@ -27,7 +26,7 @@ export const createServer = <S extends Service>(
         decode(method.request, payload),
         source,
       );
-      channel.write({
+      node.write({
         reserved,
         request: false,
         sequence,
