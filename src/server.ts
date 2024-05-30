@@ -20,9 +20,13 @@ export const createServer = <S extends Service>(
   const destroy = channel.read(
     async ({ request, sequence, signature, source, payload }) => {
       const name = keys(signatures).find(_ => signatures[_] === signature);
+
       if (!name || !request) return;
       const method = service[name]!;
-      const response = await impl[name](decode(method.request, payload));
+      const response = await impl[name](
+        decode(method.request, payload),
+        source,
+      );
       channel.write({
         reserved,
         request: false,

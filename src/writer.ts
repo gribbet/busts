@@ -12,7 +12,7 @@ export type Writer = {
 };
 
 export const createWriter: () => Writer = () => {
-  let data = new Uint8Array();
+  let data = new Uint8Array(8);
   let view = new DataView(data.buffer);
   let offset = 0;
 
@@ -27,16 +27,42 @@ export const createWriter: () => Writer = () => {
     return offset - _;
   };
 
-  const writeU8 = (_: number) => view.setUint8(advance(1), _);
-  const writeU16 = (_: number) => view.setUint16(advance(2), _);
-  const writeU32 = (_: number) => view.setUint32(advance(4), _);
-  const writeU64 = (_: bigint) => view.setBigUint64(advance(8), _);
-  const writeF32 = (_: number) => view.setFloat32(advance(4), _);
-  const writeF64 = (_: number) => view.setFloat64(advance(8), _);
+  const writeU8 = (_: number) => {
+    const offset = advance(1);
+    view.setUint8(offset, _);
+  };
+
+  const writeU16 = (_: number) => {
+    const offset = advance(2);
+    view.setUint16(offset, _);
+  };
+
+  const writeU32 = (_: number) => {
+    const offset = advance(4);
+    view.setUint32(offset, _);
+  };
+
+  const writeU64 = (_: bigint) => {
+    const offset = advance(8);
+    view.setBigUint64(offset, _);
+  };
+
+  const writeF32 = (_: number) => {
+    const offset = advance(4);
+    view.setFloat32(offset, _);
+  };
+
+  const writeF64 = (_: number) => {
+    const offset = advance(8);
+    view.setFloat64(offset, _);
+  };
+
   const writeBoolean = (_: boolean) => writeU8(_ ? 1 : 0);
+
   const writeBytes = (_: Uint8Array) => {
     writeU32(_.length);
-    data.set(_, advance(_.length));
+    const offset = advance(_.length);
+    data.set(_, offset);
   };
 
   const encoder = new TextEncoder();

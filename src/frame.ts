@@ -35,7 +35,10 @@ export const createFrameChannel = (
   const read = (handler: (_: Frame) => void) =>
     channel.read(_ => {
       const frame = decodeFrame(_);
-      if (frame.reserved === reserved && frame.destination === id)
+      if (
+        frame.reserved === reserved &&
+        (frame.destination === 0 || frame.destination === id)
+      )
         handler(frame);
     });
 

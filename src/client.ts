@@ -11,7 +11,7 @@ export const createClient = <S extends Service>(
   service: S,
   destination = 0,
 ) => {
-  let sequence = Math.random() * 2 ** 16;
+  let sequence = (Math.random() * 2 ** 16) >>> 0;
   const signatures = serviceSignatures(service);
 
   const clientMethod =
