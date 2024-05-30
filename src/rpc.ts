@@ -1,12 +1,13 @@
 import type { Channel } from "./channel";
 import { decodeFrame, encodeFrame, type Frame } from "./frame";
-import type {
-  ServiceName,
-  ServiceRequest,
-  ServiceResponse,
-  Services,
+import {
+  type ServiceName,
+  type ServiceRequest,
+  type ServiceResponse,
+  type Services,
 } from "./specification";
 import { createSubscriber } from "./subscriber";
+import { decode, encode } from "./type";
 import { createSignal } from "./util";
 
 const reserved = 0xc7;
@@ -28,11 +29,12 @@ export type Rpc<S extends Services> = {
 };
 
 export const createRpc = <S extends Services>(
-  channel: Channel<Uint8Array>,
+  channel: Channel,
   services: Services,
 ) => {
   const id = (Math.random() * 2 ** 32) >>> 0;
   let sequence = Math.random() * 2 ** 16;
+  const signatures = collectSignatures(services);
 
   const subscriber = createSubscriber<Frame>();
 
@@ -52,30 +54,32 @@ export const createRpc = <S extends Services>(
     request: ServiceRequest<S, Name>,
     destination = 0,
   ) => {
-    const [response, onResponse] = createSignal<ServiceResponse<S, Name>>();
-    const signature = serviceSignature(name);
-
-    const _sequence = sequence;
-
-    const destroy = subscriber.subscribe(
-      ({ request, sequence, signature: _signature, payload }) => {
-        if (request || signature !== _signature || sequence !== _sequence)
-          return;
-        const response = services[name]?.response.decode(payload);
-        onResponse(response);
-      },
-    );
-
-    const payload = services[name]?.request.encode(request);
+    const service = services[name];
+    const payload = encode(service.request, request);
     const frame: Frame = {
       reserved,
       sequence,
       request: true,
-      signature,
+      signature: signatures[name],
       source: id,
       destination,
       payload,
     };
+
+    const [response, onResponse] = createSignal<ServiceResponse<S, Name>>();
+
+    const destroy = subscriber.subscribe(
+      ({ request, sequence, signature, payload }) => {
+        if (
+          request ||
+          signature !== signatures[name] ||
+          sequence !== frame.sequence
+        )
+          return;
+        onResponse(decode(service.response, payload));
+      },
+    );
+
     await channel.write(encodeFrame(frame));
     sequence = (sequence + 1) % 2 ** 16;
     const result = await response;
@@ -99,14 +103,13 @@ export const createRpc = <S extends Services>(
         destination,
         payload,
       }) => {
-        if (
-          !request ||
-          destination !== id ||
-          signature !== serviceSignature(name)
-        )
+        const service = services[name];
+        if (!request || destination !== id || signature !== signatures[name])
           return;
-        const _request = services[name]?.request.decode(payload);
-        const response = await handler(_request, source);
+        const response = await handler(
+          decode(service.request, payload),
+          source,
+        );
         const frame: Frame = {
           reserved,
           request: false,
@@ -114,7 +117,7 @@ export const createRpc = <S extends Services>(
           signature,
           source: id,
           destination: source,
-          payload: services[name]?.response.encode(response),
+          payload: encode(service.response, response),
         };
         await channel.write(encodeFrame(frame));
       },

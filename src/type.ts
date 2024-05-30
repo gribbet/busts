@@ -1,6 +1,6 @@
 import type { Reader } from "./reader";
 import { assert, keys } from "./util";
-import type { Writer } from "./writer";
+import { createWriter, type Writer } from "./writer";
 
 export type Type<T> = {
   description: string;
@@ -10,11 +10,27 @@ export type Type<T> = {
 
 export type TypeType<T> = T extends Type<infer U> ? U : never;
 
+export const encode = <T>(type: Type<T>, _: T) => {
+  const writer = createWriter();
+  type.encode(writer, _);
+  return writer.bytes;
+};
+
+export const decode = <T>(type: Type<T>, _: Uint8Array) =>
+  type.decode(createReader(_));
+
 export const _void = () => {
   const description = "void";
   const encode = () => {};
   const decode = () => {};
   return { description, encode, decode } satisfies Type<void>;
+};
+
+export const literal = <T extends string>(_: T) => {
+  const description = '"{_}"';
+  const encode = () => {};
+  const decode = () => _;
+  return { description, encode, decode } satisfies Type<T>;
 };
 
 export const u8 = () => {

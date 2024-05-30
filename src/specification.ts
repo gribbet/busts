@@ -1,12 +1,13 @@
-import { crc } from "./crc";
 import type { Type } from "./type";
-import type { Any, Find, Index } from "./util";
+import { type Any, type Find, type Index } from "./util";
 
-export type Services = ServiceDefinition<Any, Any, Any>[];
+export type Services = { [name: string]: ServiceDefinition<Any, Any> };
 
-export type ServiceName<S extends Services> = S[number]["name"];
-type ServiceRequestDefinition<S extends Services> = S[number]["request"];
-type ServiceResponseDefinition<S extends Services> = S[number]["response"];
+export type ServiceName<S extends Services> = keyof S;
+type ServiceRequestDefinition<S extends Services> =
+  S[ServiceName<S>]["request"];
+type ServiceResponseDefinition<S extends Services> =
+  S[ServiceName<S>]["response"];
 
 export type ServiceRequest<
   S extends Services,
@@ -72,47 +73,9 @@ export const encodeResponse = <S extends Services, Name extends ServiceName<S>>(
 ) => responseType(services, name).encode(request);
 
 export type ServiceDefinition<
-  Name extends string,
   Request extends Type<Any>,
   Response extends Type<Any>,
 > = {
-  name: Name;
   request: Request;
   response: Response;
-  description: string;
-  signature: bigint;
 };
-
-export const service = <
-  Name extends string,
-  Request extends Type<Any>,
-  Response extends Type<Any>,
->({
-  name,
-  request,
-  response,
-}: {
-  name: Name;
-  request: Request;
-  response: Response;
-}) => {
-  const description = `${name}: ${request.description} => ${response.description}`;
-  const signature = descriptionSignature(description);
-  return {
-    name,
-    request,
-    response,
-    description,
-    signature,
-  } satisfies ServiceDefinition<Name, Request, Response>;
-};
-
-const descriptionSignature = (_: string) => crc(new TextEncoder().encode(_));
-
-export const collectSignatures = <S extends Services>(services: S) =>
-  services
-    .map(({ name, signature }) => [name, signature] as const)
-    .reduce<{ [name: string]: bigint }>((acc, [name, signature]) => {
-      acc[name] = signature;
-      return acc;
-    }, {});
