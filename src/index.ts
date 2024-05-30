@@ -1,3 +1,4 @@
+import type { Channel } from "./channel";
 import { createClient } from "./client";
 import { createFrameChannel } from "./frame";
 import { createServer } from "./server";
@@ -20,15 +21,18 @@ const service = {
   },
 } as const;
 
-const { emit, subscribe } = createSubscriber<Uint8Array>();
-const channel = createFrameChannel(
-  {
+const id = (Math.random() * 2 ** 32) >>> 0;
+
+const createMemoryChannel = () => {
+  const { emit, subscribe } = createSubscriber<Uint8Array>();
+  return {
     read: subscribe,
     write: emit,
     destroy: () => {},
-  },
-  (Math.random() * 2 ** 32) >>> 0,
-);
+  } satisfies Channel<Uint8Array>;
+};
+
+const channel = createFrameChannel(createMemoryChannel(), id);
 
 const client = createClient(channel, service);
 
