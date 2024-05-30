@@ -1,5 +1,5 @@
 import type { Channel } from "./channel";
-import { createRpc } from "./rpc";
+import { createNode } from "./node";
 import { createSubscriber } from "./subscriber";
 import { _void, literal, object, string, u64 } from "./type";
 
@@ -26,7 +26,7 @@ const channel = {
   destroy: () => {},
 } satisfies Channel;
 
-const rpc = createRpc(channel);
+const rpc = createNode(channel);
 
 const client = rpc.client(service);
 

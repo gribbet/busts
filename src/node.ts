@@ -1,10 +1,9 @@
 import type { Channel } from "./channel";
 import { decodeFrame, encodeFrame, type Frame } from "./frame";
-import { methodSignature } from "./signature";
+import { serviceSignatures } from "./signature";
 import { createSubscriber } from "./subscriber";
-import type { Method, Service, ServiceType, TypeType } from "./type";
+import type { Service, ServiceType, TypeType } from "./type";
 import { decode, encode } from "./type";
-import type { Any } from "./util";
 import { createSignal, keys } from "./util";
 
 const reserved = 0xc7;
@@ -13,7 +12,7 @@ export type Server = {
   destroy: () => void;
 };
 
-export type Rpc = {
+export type Node = {
   client: <S extends Service>(
     service: S,
     destination?: number,
@@ -22,18 +21,20 @@ export type Rpc = {
   destroy: () => void;
 };
 
-export const createRpc = (channel: Channel) => {
+export const createNode = (channel: Channel) => {
   const id = (Math.random() * 2 ** 32) >>> 0;
   let sequence = Math.random() * 2 ** 16;
   const subscriber = createSubscriber<Frame>();
 
   const client = <S extends Service>(service: S, destination = 0) => {
+    const signatures = serviceSignatures(service);
+
     const clientMethod =
       <Name extends keyof S & string>(name: Name) =>
       async (request: TypeType<S[Name]["request"]>) => {
         const method = service[name]!;
         const payload = encode(method.request, request);
-        const signature = methodSignature(name, method);
+        const signature = signatures[name];
         const frame: Frame = {
           reserved,
           sequence,
@@ -89,11 +90,13 @@ export const createRpc = (channel: Channel) => {
   });
 
   const server = <S extends Service>(service: S, impl: ServiceType<S>) => {
+    const signatures = serviceSignatures(service);
+
     const destroy = subscriber.subscribe(
       async ({ request, sequence, signature, source, payload }) => {
-        const method = undefined as unknown as Method<Any, Any> | undefined; // TODO: Match signature
-        const name = undefined as unknown as keyof S | undefined;
-        if (!method || !request) return;
+        const name = keys(signatures).find(_ => signatures[_] === signature);
+        if (!name || !request) return;
+        const method = service[name]!;
         const response = await impl[name](decode(method.request, payload));
         const frame: Frame = {
           reserved,
@@ -115,5 +118,5 @@ export const createRpc = (channel: Channel) => {
     client,
     server,
     destroy,
-  } satisfies Rpc;
+  } satisfies Node;
 };
