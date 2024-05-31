@@ -1,8 +1,7 @@
-import type { Channel } from "./channel";
 import { createClient } from "./client";
+import { createMulticastChannel } from "./multicast";
 import { createNode } from "./node";
 import { createServer } from "./server";
-import { createSubscriber } from "./subscriber";
 import { _void, literal, object, string, u64 } from "./type";
 
 const status = {
@@ -21,18 +20,10 @@ const status = {
   },
 } as const;
 
-const createMemoryChannel = () => {
-  const { emit, subscribe } = createSubscriber<Uint8Array>();
-  return {
-    read: subscribe,
-    write: emit,
-    destroy: () => {},
-  } satisfies Channel<Uint8Array>;
-};
+const channel = createMulticastChannel("238.4.5.8", 8458);
 
-const channel = createMemoryChannel();
-
-for (let id = 1; id <= 3; id++) {
+for (let i = 1; i <= 3; i++) {
+  const id = (Math.random() * 100) >>> 0;
   const node = createNode(channel, id);
 
   const client = createClient(node, status);
