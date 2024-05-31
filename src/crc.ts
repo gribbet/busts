@@ -1,7 +1,5 @@
 import { range } from "./util";
 
-// TODO: Use different CRC
-
 const mask = 0xffffffffffffffffn;
 const poly = 0x42f0e1eba9ea3693n;
 

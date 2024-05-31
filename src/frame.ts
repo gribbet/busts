@@ -15,7 +15,7 @@ const frame = object({
   reserved: u8(),
   request: boolean(),
   sequence: u16(),
-  signature: u64(), // TODO: u32?
+  signature: u64(),
   source: u32(),
   destination: u32(),
   payload: bytes(),
