@@ -128,4 +128,30 @@ export const object = <T>(fields: { [K in keyof T]: Type<T[K]> }) => {
   return { description, encode, decode } satisfies Type<T>;
 };
 
-// TODO: Union type
+export const optional = <T>(type: Type<T>) => {
+  const description = `${type.description}?`;
+
+  const encode = (writer: Writer, _?: T) => {
+    writer.writeBoolean(_ !== undefined);
+    if (_) type.encode(writer, _);
+  };
+
+  const decode = (reader: Reader) => {
+    const present = reader.readBoolean();
+    return present ? type.decode(reader) : undefined;
+  };
+
+  return { description, encode, decode } satisfies Type<T | undefined>;
+};
+
+export const enumeration = <T extends [string, ...string[]]>(values: T) => {
+  const description = values.map(_ => `"${_}"`).join(" | ");
+
+  const encode = (writer: Writer, _: T[number]) => {
+    writer.writeU16(values.indexOf(_));
+  };
+
+  const decode = (reader: Reader) => values[reader.readU16()] ?? values[0];
+
+  return { description, encode, decode } satisfies Type<T[number]>;
+};
