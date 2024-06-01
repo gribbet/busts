@@ -20,9 +20,9 @@ const status = {
   },
 } as const;
 
-const channel = createMulticastChannel("238.4.5.8", 8458);
+const channel = createMulticastChannel("228.4.5.8", 8458);
 
-for (let i = 1; i <= 3; i++) {
+for (let i = 1; i <= 1; i++) {
   const id = (Math.random() * 100) >>> 0;
   const node = createNode(channel, id);
 
