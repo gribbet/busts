@@ -3,12 +3,10 @@ import { networkInterfaces } from "os";
 
 import type { Channel } from "./channel";
 import { createSubscriber } from "./subscriber";
-import { createSignal } from "./util";
 
 export const createMulticastChannel = (address: string, port: number) => {
   const { subscribe: read, emit: reading } = createSubscriber<Uint8Array>();
   const { subscribe: writing, emit: write } = createSubscriber<Uint8Array>();
-  const [destroyed, destroy] = createSignal();
 
   const socket = createSocket({ type: "udp4", reuseAddr: true });
   socket.on("message", reading);
@@ -17,34 +15,32 @@ export const createMulticastChannel = (address: string, port: number) => {
     interfaces().forEach(_ => socket.addMembership(address, _)),
   );
 
-  const initialize = async () => {
-    await Promise.all(
-      interfaces().map(async _interface => {
-        const socket = createSocket({ type: "udp4", reuseAddr: true });
-        socket.bind(() => {
-          socket.setMulticastInterface(_interface);
-          socket.setMulticastTTL(64);
-        });
+  const sockets = interfaces().map(_interface => {
+    const socket = createSocket({ type: "udp4", reuseAddr: true });
 
-        const destroy = writing(
-          _ =>
-            new Promise((resolve, reject) =>
-              socket.send(_, port, address, error =>
-                error ? reject(error) : resolve(undefined),
-              ),
-            ),
-        );
-        await destroyed;
-        destroy();
-        socket.off("message", reading);
-        socket.close();
+    socket.bind(() => {
+      socket.setMulticastInterface(_interface);
+      socket.setMulticastTTL(64);
+    });
 
-        return socket;
-      }),
+    const destroy = writing(
+      _ =>
+        new Promise((resolve, reject) =>
+          socket.send(_, port, address, error =>
+            error ? reject(error) : resolve(undefined),
+          ),
+        ),
     );
-  };
 
-  void initialize();
+    socket.on("close", () => {
+      destroy();
+      socket.off("message", reading);
+    });
+
+    return socket;
+  });
+
+  const destroy = () => sockets.forEach(_ => _.close());
 
   return {
     read,
@@ -55,7 +51,6 @@ export const createMulticastChannel = (address: string, port: number) => {
 
 export const interfaces = () =>
   Object.entries(networkInterfaces())
-    .map(
-      ([, _ = []]) => _.find(_ => _.family === "IPv4" && !_.internal)?.address,
-    )
+    .map(([, _ = []]) => _.find(_ => _.family === "IPv4" && !_.internal))
+    .map(_ => _?.address)
     .filter((_): _ is string => !!_);
