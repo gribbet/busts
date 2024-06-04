@@ -18,7 +18,7 @@ export const createWriter: () => Writer = () => {
 
   const advance = (_: number) => {
     offset += _;
-    if (offset > data.length) {
+    while (offset > data.length) {
       const current = data;
       data = new Uint8Array(data.length * 2);
       data.set(current);
