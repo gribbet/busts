@@ -28,7 +28,7 @@ export const createReader: (data: Uint8Array) => Reader = data => {
   const readBoolean = () => !!readU8();
   const readBytes = () => {
     const length = readU32();
-    return data.slice(advance(length), offset + length);
+    return data.slice(advance(length), offset);
   };
 
   const decoder = new TextDecoder();
