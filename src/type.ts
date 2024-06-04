@@ -11,18 +11,30 @@ export type Type<T> = {
 
 export type TypeType<T> = T extends Type<infer U> ? U : never;
 
-export type Method<Request extends Type<Any>, Response extends Type<Any>> = {
-  request: Request;
-  response: Response;
-};
+export type Method<
+  Request extends Type<Any>,
+  Response extends Type<Any>,
+> = readonly [request?: Request, response?: Response];
 
 export type Service = { [name: string]: Method<Any, Any> };
 
+export type RequestType<S extends Service, Name extends keyof S> = TypeType<
+  S[Name][0]
+> extends never
+  ? void
+  : TypeType<S[Name][0]>;
+
+export type ResponseType<S extends Service, Name extends keyof S> = TypeType<
+  S[Name][1]
+> extends never
+  ? void
+  : TypeType<S[Name][1]>;
+
 export type ServiceType<S extends Service> = {
   [Name in keyof S]: (
-    request: TypeType<S[Name]["request"]>,
+    request: RequestType<S, Name>,
     source?: number,
-  ) => TypeType<S[Name]["response"]> | Promise<TypeType<S[Name]["response"]>>;
+  ) => ResponseType<S, Name> | Promise<ResponseType<S, Name>>;
 };
 
 export const encode = <T>(type: Type<T>, _: T) => {
@@ -41,10 +53,10 @@ export const _void = () => {
   return { description, encode, decode } satisfies Type<void>;
 };
 
-export const literal = <T extends string>(_: T) => {
-  const description = '"{_}"';
+export const literal = <T extends string>(value: T) => {
+  const description = `"${value}"`;
   const encode = () => {};
-  const decode = () => _;
+  const decode = () => value;
   return { description, encode, decode } satisfies Type<T>;
 };
 
@@ -115,43 +127,99 @@ export const object = <T>(fields: { [K in keyof T]: Type<T[K]> }) => {
   const description = `{ ${keys(fields)
     .map(name => `${String(name)}: ${assert(fields[name]).description}`)
     .join(", ")} }`;
-
   const encode = (writer: Writer, _: T) =>
     keys(fields).forEach(name => assert(fields[name]).encode(writer, _[name]));
-
   const decode = (reader: Reader) =>
     keys(fields).reduce((acc, name) => {
       acc[name] = assert(fields[name]).decode(reader);
       return acc;
     }, {} as T);
-
   return { description, encode, decode } satisfies Type<T>;
+};
+
+export const partial = <T>(fields: { [K in keyof T]: Type<T[K]> }) => {
+  const description = `{ ${keys(fields)
+    .map(name => `${String(name)}: ${assert(fields[name]).description}?`)
+    .join(", ")} }`;
+  const encode = (writer: Writer, _: Partial<T>) =>
+    keys(fields).forEach(name => {
+      const value = _[name];
+      const present = !!value;
+      writer.writeBoolean(present);
+      if (present) assert(fields[name]).encode(writer, value);
+    });
+  const decode = (reader: Reader) =>
+    keys(fields).reduce((acc, name) => {
+      const present = reader.readBoolean();
+      if (!present) return acc;
+      acc[name] = assert(fields[name]).decode(reader);
+      return acc;
+    }, {} as Partial<T>);
+  return { description, encode, decode } satisfies Type<Partial<T>>;
 };
 
 export const optional = <T>(type: Type<T>) => {
   const description = `${type.description}?`;
-
   const encode = (writer: Writer, _?: T) => {
     writer.writeBoolean(_ !== undefined);
     if (_) type.encode(writer, _);
   };
-
   const decode = (reader: Reader) => {
     const present = reader.readBoolean();
     return present ? type.decode(reader) : undefined;
   };
-
   return { description, encode, decode } satisfies Type<T | undefined>;
 };
 
 export const enumeration = <T extends [string, ...string[]]>(values: T) => {
+  type Value = T[number];
   const description = values.map(_ => `"${_}"`).join(" | ");
-
-  const encode = (writer: Writer, _: T[number]) => {
+  const encode = (writer: Writer, _: Value) =>
     writer.writeU16(values.indexOf(_));
+  const decode = (reader: Reader) =>
+    (values[reader.readU16()] ?? values[0]) as Value;
+  return { description, encode, decode } satisfies Type<Value>;
+};
+
+export const tuple = <T extends [] | [Type<Any>, ...Type<Any>[]]>(types: T) => {
+  type Value = { [K in keyof T]: TypeType<T[K]> };
+  const description = `[ ${types.map(_ => _.description).join(", ")} ]`;
+  const encode = (writer: Writer, _: Value) =>
+    types.forEach((type, i) => type.encode(writer, _[i]));
+  const decode = (reader: Reader) => types.map(_ => _.decode(reader)) as Value;
+  return { description, encode, decode } satisfies Type<Value>;
+};
+
+export const union = <T extends [Type<Any>, ...Type<Any>[]]>(
+  types: T,
+  discriminator: (_: TypeType<T[number]>) => T[number],
+) => {
+  type Value = TypeType<T[number]>;
+  const description = types.map(_ => _.description).join(" | ");
+  const encode = (writer: Writer, _: Value) => {
+    const index = types.indexOf(discriminator(_));
+    writer.writeU32(index);
+    types[index]?.encode(writer, _);
   };
+  const decode = (reader: Reader) => {
+    const index = reader.readU32();
+    return types[index]?.decode(reader) as Value;
+  };
+  return { description, encode, decode } satisfies Type<Value>;
+};
 
-  const decode = (reader: Reader) => values[reader.readU16()] ?? values[0];
-
-  return { description, encode, decode } satisfies Type<T[number]>;
+export const array = <T extends Type<Any>>(type: T) => {
+  type Value = TypeType<T>[];
+  const description = `${type.description}[]`;
+  const encode = (writer: Writer, _: Value) => {
+    writer.writeU32(_.length);
+    _.forEach(_ => type.encode(writer, _));
+  };
+  const decode = (reader: Reader) => {
+    const length = reader.readU32();
+    const result: Value = [];
+    for (let i = 0; i < length; i++) result.push(type.decode(reader));
+    return result;
+  };
+  return { description, encode, decode } satisfies Type<Value>;
 };

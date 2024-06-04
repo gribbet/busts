@@ -2,7 +2,7 @@ import { reserved } from "./constants";
 import type { Node } from "./node";
 import { serviceSignatures } from "./signature";
 import type { Service, ServiceType } from "./type";
-import { decode, encode } from "./type";
+import { _void, decode, encode } from "./type";
 import { keys } from "./util";
 
 export type Server = {
@@ -21,11 +21,9 @@ export const createServer = <S extends Service>(
       const name = keys(signatures).find(_ => signatures[_] === signature);
 
       if (!name || !request) return;
-      const method = service[name]!;
-      const response = await impl[name](
-        decode(method.request, payload),
-        source,
-      );
+      const [requestType = _void(), responseType = _void()] =
+        service[name] ?? [];
+      const response = await impl[name](decode(requestType, payload), source);
       node.write({
         reserved,
         request: false,
@@ -33,7 +31,7 @@ export const createServer = <S extends Service>(
         signature,
         source,
         destination: source,
-        payload: encode(method.response, response),
+        payload: encode(responseType, response),
       });
     },
   );

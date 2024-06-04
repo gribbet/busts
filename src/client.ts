@@ -2,8 +2,8 @@ import { reserved } from "./constants";
 import { type Frame } from "./frame";
 import type { Node } from "./node";
 import { serviceSignatures } from "./signature";
-import type { Service, ServiceType, TypeType } from "./type";
-import { decode, encode } from "./type";
+import type { RequestType, ResponseType, Service, ServiceType } from "./type";
+import { _void, decode, encode } from "./type";
 import { createSignal, keys } from "./util";
 
 export const createClient = <S extends Service>(
@@ -16,12 +16,10 @@ export const createClient = <S extends Service>(
 
   const clientMethod =
     <Name extends keyof S & string>(name: Name) =>
-    async (
-      request: TypeType<S[Name]["request"]>,
-      destination = _destination,
-    ) => {
-      const method = service[name]!;
-      const payload = encode(method.request, request);
+    async (request: RequestType<S, Name>, destination = _destination) => {
+      const [requestType = _void(), responseType = _void()] =
+        service[name] ?? [];
+      const payload = encode(requestType, request);
       const signature = signatures[name];
       const frame: Frame = {
         reserved,
@@ -33,8 +31,7 @@ export const createClient = <S extends Service>(
         payload,
       };
 
-      const [response, onResponse] =
-        createSignal<TypeType<S[Name]["response"]>>();
+      const [response, onResponse] = createSignal<ResponseType<S, Name>>();
 
       const destroy = node.read(
         ({ request, sequence, signature: _signature, payload }) => {
@@ -44,7 +41,7 @@ export const createClient = <S extends Service>(
             sequence !== frame.sequence
           )
             return;
-          onResponse(decode(method.response, payload));
+          onResponse(decode(responseType, payload));
         },
       );
 
