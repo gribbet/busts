@@ -5,7 +5,10 @@ import { decodeFrame, encodeFrame } from "./frame";
 
 export type Node = Channel<Frame>;
 
-export const createNode = (channel: Channel<Uint8Array>, id: number) => {
+export const createNode = (
+  channel: Channel<Uint8Array>,
+  id: number = (Math.random() * 2 ** 32) >>> 0,
+) => {
   const read = (handler: (_: Frame) => void) =>
     channel.read(_ => {
       const frame = decodeFrame(_);
