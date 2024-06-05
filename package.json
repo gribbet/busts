@@ -1,10 +1,10 @@
 {
-  "name": "rpc.ts",
-  "version": "0.0.1",
+  "name": "busts",
+  "version": "0.1.0",
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gribbet/rpc.ts.git"
+    "url": "git+https://github.com/gribbet/busts.git"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
