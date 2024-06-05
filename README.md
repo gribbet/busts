@@ -1,6 +1,6 @@
 # busts
 
-A simple binary, type-safe peer-to-peer RPC system
+A simple binary, type-safe, peer-to-peer RPC system
 
 1. Define your schema
 
