@@ -18,15 +18,8 @@
     "lint": "eslint src"
   },
   "devDependencies": {
+    "@gribbet/eslint-config": "github:gribbet/eslint-config",
     "@types/node": "^20.12.13",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-no-async-without-await": "^1.2.0",
-    "eslint-plugin-prettier": "^5.1.1",
-    "eslint-plugin-simple-import-sort": "^10.0.0",
-    "eslint-plugin-unused-imports": "^3.0.0",
-    "prettier": "^3.1.1",
     "tsx": "^4.11.0",
     "typescript": "^5.3.3"
   }

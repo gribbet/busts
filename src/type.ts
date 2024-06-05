@@ -18,17 +18,11 @@ export type Method<
 
 export type Service = { [name: string]: Method<Any, Any> };
 
-export type RequestType<S extends Service, Name extends keyof S> = TypeType<
-  S[Name][0]
-> extends never
-  ? void
-  : TypeType<S[Name][0]>;
+export type RequestType<S extends Service, Name extends keyof S> =
+  TypeType<S[Name][0]> extends never ? void : TypeType<S[Name][0]>;
 
-export type ResponseType<S extends Service, Name extends keyof S> = TypeType<
-  S[Name][1]
-> extends never
-  ? void
-  : TypeType<S[Name][1]>;
+export type ResponseType<S extends Service, Name extends keyof S> =
+  TypeType<S[Name][1]> extends never ? void : TypeType<S[Name][1]>;
 
 export type ServiceType<S extends Service> = {
   [Name in keyof S]: (
