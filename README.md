@@ -4,7 +4,7 @@ A simple binary, type-safe peer-to-peer RPC system
 
 1. Define your schema
 
-```
+```ts
 export const heartbeatService = {
   heartbeat: [object({ timestamp: u32() })],
 } as const;
@@ -16,7 +16,7 @@ export const infoService = {
 
 2. Define a channel and peer nodes
 
-```
+```ts
 const channel = createSimpleChannel();
 const node1 = createNode(channel);
 const node2 = createNode(channel);
@@ -25,7 +25,7 @@ const node3 = createNode(channel);
 
 3. Implement
 
-```
+```ts
 createServer(node1, infoService, {
   name: () => "Node 1",
 });
@@ -38,7 +38,8 @@ createServer(node3, heartbeatService, {
   heartbeat: async (_, source) => {
     const info = createClient(node3, infoService, source);
     const name = await info.name();
-    console.log(`Node ${source?.toString(16).padStart(8, "0")}: ${name}`);
+    const id = source?.toString(16).padStart(8, "0");
+    console.log(`Node ${id}: ${name}`);
   },
 });
 
