@@ -17,8 +17,7 @@ export const createClient = <S extends Service>(
   const clientMethod =
     <Name extends keyof S & string>(name: Name) =>
     async (request: RequestType<S, Name>, destination = _destination) => {
-      const [requestType = _void(), responseType = _void()] =
-        service[name] ?? [];
+      const [requestType = _void(), responseType] = service[name] ?? [];
       const payload = encode(requestType, request);
       const signature = signatures[name];
       const frame: Frame = {
@@ -33,24 +32,28 @@ export const createClient = <S extends Service>(
 
       const [response, onResponse] = createSignal<ResponseType<S, Name>>();
 
-      const destroy = node.read(
-        ({ request, sequence, signature: _signature, payload }) => {
-          if (
-            request ||
-            signature !== _signature ||
-            sequence !== frame.sequence
-          )
-            return;
-          onResponse(decode(responseType, payload));
-        },
-      );
+      const destroy =
+        responseType !== undefined
+          ? node.read(
+              ({ request, sequence, signature: _signature, payload }) => {
+                if (
+                  request ||
+                  signature !== _signature ||
+                  sequence !== frame.sequence
+                )
+                  return;
+                onResponse(decode(responseType, payload));
+              },
+            )
+          : undefined;
 
       try {
         node.write(frame);
         sequence = (sequence + 1) % 2 ** 16;
+        if (!responseType) return;
         return await response;
       } finally {
-        destroy();
+        destroy?.();
       }
     };
 
