@@ -156,7 +156,7 @@ export const optional = <T>(type: Type<T>) => {
   const description = `${type.description}?`;
   const encode = (writer: Writer, _?: T) => {
     writer.writeBoolean(_ !== undefined);
-    if (_) type.encode(writer, _);
+    if (_ !== undefined) type.encode(writer, _);
   };
   const decode = (reader: Reader) => {
     const present = reader.readBoolean();
