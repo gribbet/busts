@@ -15,12 +15,14 @@ export const createServer = <S extends Service>(
   impl: ServiceType<S>,
 ) => {
   const signatures = serviceSignatures(service);
+  const names = new Map(
+    Object.entries(signatures).map(([name, signature]) => [signature, name]),
+  );
 
   const destroy = node.read(
     async ({ request, sequence, signature, source, payload }) => {
-      const name = keys(signatures).find(_ => signatures[_] === signature);
-
-      if (!name || !request) return;
+      const name = names.get(signature);
+      if (!name || !impl[name] || !request) return;
       const [requestType = _void(), responseType] = service[name] ?? [];
       const response = await impl[name](decode(requestType, payload), source);
       if (responseType === undefined) return;
