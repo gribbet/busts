@@ -15,7 +15,8 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@gribbet/eslint-config": "github:gribbet/eslint-config",
