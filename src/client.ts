@@ -30,27 +30,25 @@ export const createClient = <S extends Service>(
         payload,
       };
 
+      if (responseType === undefined) return node.write(frame);
+
       const [response, onResponse] = createSignal<ResponseType<S, Name>>();
 
-      const destroy =
-        responseType !== undefined
-          ? node.read(
-              ({ request, sequence, signature: _signature, payload }) => {
-                if (
-                  request ||
-                  signature !== _signature ||
-                  sequence !== frame.sequence
-                )
-                  return;
-                onResponse(decode(responseType, payload));
-              },
-            )
-          : undefined;
+      const destroy = node.read(
+        ({ request, sequence, signature: _signature, payload }) => {
+          if (
+            request ||
+            signature !== _signature ||
+            sequence !== frame.sequence
+          )
+            return;
+          onResponse(decode(responseType, payload));
+        },
+      );
 
       try {
         node.write(frame);
         sequence = (sequence + 1) % 2 ** 16;
-        if (!responseType) return;
         return await response;
       } finally {
         destroy?.();
