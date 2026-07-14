@@ -21,9 +21,9 @@ export const createServer = <S extends Service>(
       const name = keys(signatures).find(_ => signatures[_] === signature);
 
       if (!name || !request) return;
-      const [requestType = _void(), responseType = _void()] =
-        service[name] ?? [];
+      const [requestType = _void(), responseType] = service[name] ?? [];
       const response = await impl[name](decode(requestType, payload), source);
+      if (responseType === undefined) return;
       node.write({
         reserved,
         request: false,
